@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>成语卡牌对战游戏</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="connection-status" id="connectionStatus">连接中...</div>
+
+    <div class="container">
+        <div class="header">
+            <h1>🎴 成语卡牌对战游戏</h1>
+            <p>基于中华传统文化的策略卡牌游戏</p>
+        </div>
+
+        <!-- 房间控制区域 -->
+        <div class="game-controls">
+            <div class="control-group">
+                <button class="btn" onclick="createRoom()">创建房间</button>
+                <input type="text" class="input-field" id="roomIdInput" placeholder="输入房间ID">
+                <button class="btn" onclick="joinRoom()">加入房间</button>
+            </div>
+            <div class="control-group" id="gameActions" style="display: none;">
+                <button class="btn" id="startGameBtn" onclick="startGame()" disabled>开始游戏</button>
+                <button class="btn" onclick="refreshGameState()">刷新状态</button>
+            </div>
+        </div>
+
+        <!-- 消息提示区域 -->
+        <div id="messages"></div>
+
+        <!-- 游戏状态展示 -->
+        <div class="status-display" id="gameStatus" style="display: none;">
+            <h3 class="status-title">游戏状态</h3>
+            <div id="gameStatusContent"></div>
+        </div>
+
+        <!-- 游戏主战场区域 -->
+        <div class="game-board" id="gameBoard" style="display: none;">
+            <!-- 玩家1区域 -->
+            <div class="player-area" id="player1Area">
+                <div class="player-title">
+                    <span>玩家 1</span>
+                    <span class="player-status" id="player1Status">等待中</span>
+                </div>
+                <div class="card-area">
+                    <h4>手牌 (<span id="player1HandCount">0</span>)</h4>
+                    <div class="cards-container" id="player1Hand"></div>
+                </div>
+                <div class="card-area">
+                    <h4>得分区 (<span id="player1ScoreCount">0</span>)</h4>
+                    <div class="cards-container" id="player1Score"></div>
+                </div>
+            </div>
+
+            <!-- 玩家2区域 -->
+            <div class="player-area" id="player2Area">
+                <div class="player-title">
+                    <span>玩家 2</span>
+                    <span class="player-status" id="player2Status">等待中</span>
+                </div>
+                <div class="card-area">
+                    <h4>手牌 (<span id="player2HandCount">0</span>)</h4>
+                    <div class="cards-container" id="player2Hand"></div>
+                </div>
+                <div class="card-area">
+                    <h4>得分区 (<span id="player2ScoreCount">0</span>)</h4>
+                    <div class="cards-container" id="player2Score"></div>
+                </div>
+            </div>
+
+            <!-- 出牌操作区域 -->
+            <div id="playArea" class="play-area" style="display: none;">
+                <h3>出牌操作 <span id="turnIndicator" class="turn-indicator">（你的回合）</span></h3>
+                <div class="play-controls">
+                    <div class="card-selection">
+                        <label for="playCardSelect">选择要出的卡牌：</label>
+                        <select id="playCardSelect" class="card-select">
+                            <option value="">（等待加载手牌）</option>
+                        </select>
+                    </div>
+                    <button id="playCardButton" class="action-button" disabled>出牌</button>
+                </div>
+                <div id="playAreaHint" class="play-hint"></div>
+            </div>
+        </div>
+
+        <!-- 游戏信息统计 -->
+        <div class="game-info" id="gameInfo" style="display: none;">
+            <div class="info-item">
+                <div class="info-value" id="deckCount">40</div>
+                <div class="info-label">牌库剩余</div>
+            </div>
+            <div class="info-item">
+                <div class="info-value" id="discardCount">0</div>
+                <div class="info-label">弃牌区</div>
+            </div>
+            <div class="info-item">
+                <div class="info-value" id="turnCount">0</div>
+                <div class="info-label">回合数</div>
+            </div>
+            <div class="info-item">
+                <div class="info-value" id="currentPlayer">-</div>
+                <div class="info-label">当前玩家</div>
+            </div>
+        </div>
+
+        <!-- 弃牌展示 -->
+        <div class="status-display" id="discardArea" style="display: none;">
+            <h3 class="status-title">🗑️ 弃牌区</h3>
+            <div class="cards-container" id="discardCards">
+                <div style="color: #999; text-align: center; padding: 20px;">暂无弃牌</div>
+            </div>
+        </div>
+
+        <!-- 游戏结束提示 -->
+        <div class="status-display" id="gameEndNotice" style="display: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+            <h3 class="status-title" style="color: white; border-bottom-color: white;">🎉 游戏结束</h3>
+            <div id="gameEndContent" style="text-align: center; font-size: 1.2em;"></div>
+        </div>
+    </div>
+
+    <!-- 游戏核心逻辑 -->
+    <script src="room.js"></script>
+    <script src="game.js"></script>
+</body>
+
+</html>
