@@ -26,10 +26,11 @@ class GameRoundManager:
         2. 行动阶段（主攻 + 反击 + 连击）
         3. 胜负判断
         """
-        self.prepare_phase()
+        
         self.action_phase(main_card, response_card, combo_card)
         self.check_end_conditions()
         self.state.switch_turn()
+        self.prepare_phase()
 
     def prepare_phase(self):
         """准备阶段：当前玩家抽一张牌"""
@@ -77,39 +78,32 @@ class GameRoundManager:
                           defender: Player,
                           card: Card,
                           is_counter: bool = False):
+        """结算阶段：
+        - defender释义/典故判定失败 → 弃牌并触发效果
+        - defender全部成功 → defender得分不触发效果
         """
-        结算阶段：
-        - 释义判定失败 → 弃牌
-        - 释义成功 + 典故失败 → 得分但不触发效果
-        - 全部成功 → 得分 + 触发效果
-        """
-        if not self.meaning_judgement(defender, card):
-            print(f"[判定❌] 释义错误 → {card.name} 进入弃牌区")
+        meaning_success = self.meaning_judgement(defender, card)
+        story_success = self.story_judgement(defender, card)
+        
+        if not meaning_success or not story_success:
+            print(f"[判定❌] {'释义' if not meaning_success else '典故'}错误 → {card.name} 进入弃牌区并触发效果")
             self.state.move_to_discard(card)
+            # 执行卡牌效果
+            if card.effects:
+                print(f"[效果🎯] {card.effect_description}")
+                for effect in card.effects:
+                    self.state = effect.execute(self.state)
             return
 
-        if not self.story_judgement(defender, card):
-            print(f"[判定⚠️] 典故错误 → {card.name} 得分但无效果")
-            attacker.add_to_score_zone(card)
-            return
-
-        print(f"[判定✅] {card.name} 完全正确 → 加分并触发效果")
-        attacker.add_to_score_zone(card)
-        self.state.get_zone_counts()  # 用于条件判断
-        updated_state = card.execute_effects(self.state.get_zone_counts())
-        if card.effect_description:
-            print(f"[效果🎯] {card.effect_description}")
+        print(f"[判定✅] {card.name} 完全正确 → {defender.player_id}得分")
+        defender.add_to_score_zone(card)
 
     def meaning_judgement(self, defender: Player, card: Card) -> bool:
-        """
-        模拟对释义的判断
-        """
+        """模拟对释义的判断"""
         return self.judge.judge_meaning(card, defender.player_id)
 
     def story_judgement(self, defender: Player, card: Card) -> bool:
-        """
-        模拟对典故的判断
-        """
+        """模拟对典故的判断"""
         return self.judge.judge_story(card, defender.player_id)
 
     def check_end_conditions(self):

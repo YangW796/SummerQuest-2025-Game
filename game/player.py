@@ -73,8 +73,8 @@ class Player:
 
     def summary(self) -> str:
         """简要状态概览"""
-        hand_cards = ", ".join(str(card) for card in self.hand)
-        return f"[{self.player_id}] 🖐️ 手牌: {hand_cards} | 🏆 得分区: {len(self.score_zone)} 张"
+        hand_cards = "".join(f"\n {str(card)}" for card in self.hand)
+        return f"[{self.player_id}] 🖐️ 手牌:{hand_cards} | 🏆 得分区: {len(self.score_zone)} 张"
 
     def to_dict(self) -> dict:
         """将玩家状态转换为字典格式"""

@@ -1,6 +1,8 @@
 from enum import Enum
-from typing import List, Union, Optional
+from typing import List, Union, Optional,TYPE_CHECKING
 from dataclasses import dataclass
+if TYPE_CHECKING:
+    from game.game_state import GameState
 
 
 # ==========================
@@ -47,7 +49,7 @@ class IfCondition:
     operator: OperatorType
     operand_b: Union[GameZone, int]
 
-    def evaluate(self, game_state: dict) -> bool:
+    def evaluate(self, game_state: 'GameState') -> bool:
         """判断 IF 条件是否成立"""
         val_a = self._get_value(self.operand_a, game_state)
         val_b = self._get_value(self.operand_b, game_state)
@@ -61,10 +63,17 @@ class IfCondition:
             case OperatorType.NEQ: return val_a != val_b
         return False
 
-    def _get_value(self, operand: Union[GameZone, int], game_state: dict) -> int:
+    def _get_value(self, operand: Union[GameZone, int], game_state: 'GameState') -> int:
         if isinstance(operand, int):
             return operand
-        return game_state.get(operand.value, 0)
+        match operand:
+            case GameZone.H: return len(game_state.deck)
+            case GameZone.P1: return game_state.player1.hand_count()
+            case GameZone.P2: return game_state.player2.hand_count()
+            case GameZone.S1: return game_state.player1.score_count()
+            case GameZone.S2: return game_state.player2.score_count()
+            case GameZone.A: return len(game_state.discard_pile)
+        return 0
 
 
 @dataclass
@@ -74,26 +83,81 @@ class ActionEffect:
     num: int
     action_type: ActionType
 
-    def execute(self, game_state: dict) -> dict:
-        """执行动作效果（当前为接口留空）"""
-        # 实际游戏执行逻辑应由服务器调用实现
+    def execute(self, game_state: 'GameState') -> 'GameState':
+        """执行动作效果，直接修改 GameState 对象"""
+        # 获取源区域和目标区域的卡牌列表引用
+        from_cards = self._get_zone_cards(game_state, self.from_zone)
+        if not from_cards:
+            return game_state
+
+        # 根据动作类型选择卡牌
+        cards_to_move = []
+        match self.action_type:
+            case ActionType.ORDER:
+                # 从顶部开始取指定数量
+                cards_to_move = from_cards[:min(self.num, len(from_cards))]
+            case ActionType.RANDOM:
+                # 随机选择指定数量
+                if len(from_cards) > self.num:
+                    cards_to_move = random.sample(from_cards, self.num)
+                else:
+                    cards_to_move = from_cards.copy()
+            case ActionType.SELECT:
+                # 暂不支持指定选取
+                return game_state
+
+        # 从源区域移除卡牌
+        for card in cards_to_move:
+            from_cards.remove(card)
+
+        # 将卡牌添加到目标区域
+        self._add_to_zone(game_state, self.to_zone, cards_to_move)
+
         return game_state
+
+    def _get_zone_cards(self, game_state: 'GameState', zone: GameZone) -> List['Card']:
+        """获取指定区域的卡牌列表引用"""
+        match zone:
+            case GameZone.H: return game_state.deck
+            case GameZone.P1: return game_state.player1.hand
+            case GameZone.P2: return game_state.player2.hand
+            case GameZone.S1: return game_state.player1.score_zone
+            case GameZone.S2: return game_state.player2.score_zone
+            case GameZone.A: return game_state.discard_pile
+        return []
+
+    def _add_to_zone(self, game_state: 'GameState', zone: GameZone, cards: List['Card']):
+        """将卡牌添加到指定区域"""
+        match zone:
+            case GameZone.H: game_state.deck.extend(cards)
+            case GameZone.P1: 
+                for card in cards:
+                    game_state.player1.draw_card(card)
+            case GameZone.P2:
+                for card in cards:
+                    game_state.player2.draw_card(card)
+            case GameZone.S1:
+                for card in cards:
+                    game_state.player1.add_to_score_zone(card)
+            case GameZone.S2:
+                for card in cards:
+                    game_state.player2.add_to_score_zone(card)
+            case GameZone.A: game_state.discard_pile.extend(cards)
 
 
 @dataclass
 class CardEffect:
     effects: List[Union[IfCondition, ActionEffect]]
 
-    def execute(self, game_state: dict) -> dict:
+    def execute(self, game_state: 'GameState') -> 'GameState':
         """顺序执行效果链"""
-        current_state = game_state.copy()
         for effect in self.effects:
             if isinstance(effect, IfCondition):
-                if not effect.evaluate(current_state):
+                if not effect.evaluate(game_state):
                     break  # 条件不满足，中断整个效果链
             elif isinstance(effect, ActionEffect):
-                current_state = effect.execute(current_state)
-        return current_state
+                game_state = effect.execute(game_state)
+        return game_state
 
 
 # ==========================
@@ -123,11 +187,11 @@ class Card:
     def has_combo_effect(self) -> bool:
         return self.card_type == CardType.COMBO
 
-    def execute_effects(self, game_state: dict) -> dict:
-        current_state = game_state.copy()
+    def execute_effects(self, game_state: 'GameState') -> 'GameState':
+        """执行卡牌的所有效果"""
         for effect in self.effects:
-            current_state = effect.execute(current_state)
-        return current_state
+            game_state = effect.execute(game_state)
+        return game_state
 
     def __str__(self) -> str:
         symbols = {
@@ -135,7 +199,8 @@ class Card:
             CardType.COUNTER: "🛡️",
             CardType.COMBO: "⚡"
         }
-        return f"{symbols.get(self.card_type, '')} {self.name}"
+        effect_text = f"------{self.effect_description}" if self.effect_description else ""
+        return f"\n{symbols.get(self.card_type, '')} {self.name}{effect_text}\n"
 
     def __repr__(self) -> str:
         return f"Card(id={self.id}, name='{self.name}', type={self.card_type.value})"
